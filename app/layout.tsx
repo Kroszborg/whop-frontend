@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Space_Grotesk } from "next/font/google";
+import { Space_Grotesk, Jersey_15 } from "next/font/google";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -8,9 +8,16 @@ const spaceGrotesk = Space_Grotesk({
   weight: ["400", "500", "700"],
 });
 
+const jersey15 = Jersey_15({
+  variable: "--font-jersey-15",
+  subsets: ["latin"],
+  weight: ["400"],
+});
+
 export const metadata: Metadata = {
   title: "Rocket - Solana Crash Game",
-  description: "Official Whop Solana Crash Game - Play and win with cryptocurrency",
+  description:
+    "Official Whop Solana Crash Game - Play and win with cryptocurrency",
 };
 
 export default function RootLayout({
@@ -20,14 +27,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Jersey+15&display=swap" rel="stylesheet" />
-      </head>
       <body
-        className={`${spaceGrotesk.variable} antialiased`}
-        style={{ fontFamily: 'var(--font-space-grotesk), sans-serif' }}
+        className={`${spaceGrotesk.variable} ${jersey15.variable} antialiased`}
+        style={{ fontFamily: "var(--font-space-grotesk), sans-serif" }}
       >
         {children}
       </body>

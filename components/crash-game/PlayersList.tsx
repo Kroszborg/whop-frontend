@@ -2,7 +2,7 @@
 
 import { Player } from '@/types/game';
 import { getPlayerAvatar } from '@/lib/dummy-data';
-import { Coins, Users } from 'lucide-react';
+import { Users } from 'lucide-react';
 import Image from 'next/image';
 
 interface PlayersListProps {

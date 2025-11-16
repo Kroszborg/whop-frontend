@@ -5,7 +5,6 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 import { BetMode } from '@/types/game';
 import { PlayersList } from './PlayersList';
 import { dummyPlayers } from '@/lib/dummy-data';
-import { RetroButton } from '@/components/retroui/RetroButton';
 import Image from 'next/image';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { GAME_STATES } from './GameCanvas';

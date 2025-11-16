@@ -1,8 +1,7 @@
 'use client';
 
-import { multiplierHistory, getRetroButtonVariant } from '@/lib/dummy-data';
+import { multiplierHistory } from '@/lib/dummy-data';
 import { MultiplierBadge } from '@/types/game';
-import { RetroButton } from '@/components/retroui/RetroButton';
 
 interface MultiplierHistoryProps {
   onMultiplierClick: (value: number) => void;

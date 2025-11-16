@@ -11,12 +11,6 @@ interface MultiplierHistoryProps {
 export function MultiplierHistory({ onMultiplierClick }: MultiplierHistoryProps) {
   return (
     <div className="relative">
-      {/* Gradient fade on left */}
-      <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-[#0A0A0B] to-transparent z-10 pointer-events-none" />
-
-      {/* Gradient fade on right */}
-      <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#0A0A0B] to-transparent z-10 pointer-events-none" />
-
       <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-700 hover:scrollbar-thumb-gray-600">
         <div className="flex gap-2 min-w-max px-1 py-1">
           {multiplierHistory.map((badge, index) => (

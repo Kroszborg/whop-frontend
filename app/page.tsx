@@ -55,6 +55,7 @@ export default function Home() {
                 setBetPlaced(true);
               }}
               betPlaced={betPlaced}
+              gameStatus={gameStatus}
             />
           </div>
 

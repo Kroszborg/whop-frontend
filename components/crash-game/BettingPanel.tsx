@@ -8,15 +8,17 @@ import { dummyPlayers } from '@/lib/dummy-data';
 import { RetroButton } from '@/components/retroui/RetroButton';
 import Image from 'next/image';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { GAME_STATES } from './GameCanvas';
 
 interface BettingPanelProps {
   cashoutMultiplier: number;
   onCashoutChange: (value: number) => void;
   onBetAmountChange?: (value: number) => void;
   betPlaced?: boolean;
+  gameStatus?: number;
 }
 
-export function BettingPanel({ cashoutMultiplier, onCashoutChange, onBetAmountChange, betPlaced = false }: BettingPanelProps) {
+export function BettingPanel({ cashoutMultiplier, onCashoutChange, onBetAmountChange, betPlaced = false, gameStatus }: BettingPanelProps) {
   const [betMode, setBetMode] = useState<BetMode>('manual');
   const [betAmount, setBetAmount] = useState<string>('0.00');
   const [estimatedProfit, setEstimatedProfit] = useState<string>('0.00');
@@ -197,9 +199,9 @@ export function BettingPanel({ cashoutMultiplier, onCashoutChange, onBetAmountCh
 
       {/* Place Bet Button */}
       <button
-        disabled={!betAmount || parseFloat(betAmount) <= 0 || betPlaced}
+        disabled={!betAmount || parseFloat(betAmount) <= 0 || betPlaced || gameStatus === GAME_STATES.InProgress}
         onClick={() => {
-          if (onBetAmountChange && parseFloat(betAmount) > 0 && !betPlaced) {
+          if (onBetAmountChange && parseFloat(betAmount) > 0 && !betPlaced && gameStatus !== GAME_STATES.InProgress) {
             onBetAmountChange(parseFloat(betAmount));
           }
         }}
@@ -209,11 +211,11 @@ export function BettingPanel({ cashoutMultiplier, onCashoutChange, onBetAmountCh
             "radial-gradient(87.05% 70.83% at 50% 70.83%, #FFC83E 55.29%, #F38A00 100%)",
           border: "1.8px solid #BB5700",
           boxShadow: "0px 4.4px 2px 0px rgba(255, 255, 255, 0.33) inset",
-          opacity: !betAmount || parseFloat(betAmount) <= 0 || betPlaced ? 0.4 : 1,
-          cursor: !betAmount || parseFloat(betAmount) <= 0 || betPlaced ? 'not-allowed' : 'pointer',
+          opacity: !betAmount || parseFloat(betAmount) <= 0 || betPlaced || gameStatus === GAME_STATES.InProgress ? 0.4 : 1,
+          cursor: !betAmount || parseFloat(betAmount) <= 0 || betPlaced || gameStatus === GAME_STATES.InProgress ? 'not-allowed' : 'pointer',
         }}
       >
-        {betPlaced ? 'BET PLACED' : 'PLACE BET'}
+        {gameStatus === GAME_STATES.InProgress ? 'GAME IN PROGRESS' : betPlaced ? 'BET PLACED' : 'PLACE BET'}
       </button>
 
       {/* Dashed Separator */}

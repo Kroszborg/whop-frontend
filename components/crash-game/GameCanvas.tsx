@@ -549,8 +549,8 @@ export function GameCanvas({ betAmount, onGameStatusChange }: GameCanvasProps) {
             >
               {payout.toFixed(2)}x
             </div>
-            {/* Show profit if bet is placed */}
-            {betAmount > 0 && gameStatus === GAME_STATES.InProgress && (
+            {/* Show profit if bet is placed and payout >= 1.0x */}
+            {betAmount > 0 && gameStatus === GAME_STATES.InProgress && payout >= 1.0 && (
               <div className="text-[#0AFDA5] retro-body text-xl md:text-2xl font-semibold mt-2 flex flex-row items-center gap-2 justify-center">
                   <Image
                     src="/solana.svg"

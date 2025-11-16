@@ -283,39 +283,7 @@ export function GameCanvas({ betAmount, onGameStatusChange }: GameCanvasProps) {
       gameStateRef.current.rotation = rotation;
 
       // Generate and draw stars only during active gameplay
-      if (gameStatus === GAME_STATES.InProgress) {
-        // Generate stars
-        if (gameStateRef.current.stars.length < 50) {
-          gameStateRef.current.stars.push({
-            x: Math.random() * width,
-            y: Math.random() * height,
-            size: Math.random() * 3 + 1,
-            t: Math.random() * 200 + 100,
-          });
-        }
-
-        // Draw stars
-        gameStateRef.current.stars.forEach((star, i) => {
-          ctx.save();
-          ctx.globalAlpha = 0.6;
-          ctx.fillStyle = '#faca15';
-          ctx.beginPath();
-          ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.restore();
-
-          star.x -= 0.3;
-          star.y += 0.1;
-
-          star.t--;
-          if (star.t < 0 || star.y > height || star.x < 0) {
-            gameStateRef.current.stars.splice(i, 1);
-          }
-        });
-      } else {
-        // Clear stars when not in progress
-        gameStateRef.current.stars = [];
-      }
+     
 
       // Add current position to trail during flight
       if (gameStatus === GAME_STATES.InProgress) {

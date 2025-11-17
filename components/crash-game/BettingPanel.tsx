@@ -4,10 +4,10 @@ import { useState, useEffect } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { BetMode } from '@/types/game';
 import { PlayersList } from './PlayersList';
-import { dummyPlayers } from '@/lib/dummy-data';
 import Image from 'next/image';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { GAME_STATES } from './GameCanvas';
+import type { BetType } from '@/types/database';
 
 interface BettingPanelProps {
   cashoutMultiplier: number;
@@ -15,13 +15,26 @@ interface BettingPanelProps {
   onBetAmountChange?: (value: number) => void;
   betPlaced?: boolean;
   gameStatus?: number;
+  balance?: number;
+  players?: BetType[];
+  onCashout?: () => void;
+  isAuthenticated?: boolean;
 }
 
-export function BettingPanel({ cashoutMultiplier, onCashoutChange, onBetAmountChange, betPlaced = false, gameStatus }: BettingPanelProps) {
+export function BettingPanel({ 
+  cashoutMultiplier, 
+  onCashoutChange, 
+  onBetAmountChange, 
+  betPlaced = false, 
+  gameStatus,
+  balance = 0,
+  players = [],
+  onCashout,
+  isAuthenticated = false,
+}: BettingPanelProps) {
   const [betMode, setBetMode] = useState<BetMode>('manual');
   const [betAmount, setBetAmount] = useState<string>('0.00');
   const [estimatedProfit, setEstimatedProfit] = useState<string>('0.00');
-  const [balance] = useState<number>(43.8);
 
   useEffect(() => {
     if (parseFloat(betAmount) > 0) {
@@ -54,8 +67,8 @@ export function BettingPanel({ cashoutMultiplier, onCashoutChange, onBetAmountCh
     onCashoutChange(parseFloat(newValue.toFixed(2)));
   };
 
-  const totalPlayers = dummyPlayers.length;
-  const totalBetPool = dummyPlayers.reduce((sum, p) => sum + p.betAmount, 0);
+  const totalPlayers = players.length;
+  const totalBetPool = players.reduce((sum, p) => sum + p.betAmount, 0);
 
   return (
     <div className="h-full flex flex-col game-panel-bg rounded-xl p-5 md:p-6">
@@ -196,26 +209,48 @@ export function BettingPanel({ cashoutMultiplier, onCashoutChange, onBetAmountCh
         </div>
       </div>
 
-      {/* Place Bet Button */}
-      <button
-        disabled={!betAmount || parseFloat(betAmount) <= 0 || betPlaced || gameStatus === GAME_STATES.InProgress}
-        onClick={() => {
-          if (onBetAmountChange && parseFloat(betAmount) > 0 && !betPlaced && gameStatus !== GAME_STATES.InProgress) {
-            onBetAmountChange(parseFloat(betAmount));
-          }
-        }}
-        className="w-full retro-text text-lg mb-4 px-6 py-3 text-white rounded-lg transition-all duration-150"
-        style={{
-          background:
-            "radial-gradient(87.05% 70.83% at 50% 70.83%, #FFC83E 55.29%, #F38A00 100%)",
-          border: "1.8px solid #BB5700",
-          boxShadow: "0px 4.4px 2px 0px rgba(255, 255, 255, 0.33) inset",
-          opacity: !betAmount || parseFloat(betAmount) <= 0 || betPlaced || gameStatus === GAME_STATES.InProgress ? 0.4 : 1,
-          cursor: !betAmount || parseFloat(betAmount) <= 0 || betPlaced || gameStatus === GAME_STATES.InProgress ? 'not-allowed' : 'pointer',
-        }}
-      >
-        {gameStatus === GAME_STATES.InProgress ? 'GAME IN PROGRESS' : betPlaced ? 'BET PLACED' : 'PLACE BET'}
-      </button>
+      {/* Place Bet / Cashout Button */}
+      {gameStatus === GAME_STATES.InProgress && betPlaced ? (
+        <button
+          onClick={() => {
+            if (onCashout && isAuthenticated) {
+              onCashout();
+            }
+          }}
+          disabled={!isAuthenticated}
+          className="w-full retro-text text-lg mb-4 px-6 py-3 text-white rounded-lg transition-all duration-150"
+          style={{
+            background:
+              "radial-gradient(87.05% 70.83% at 50% 70.83%, #18FFAA 55.29%, #01764D 100%)",
+            border: "1.8px solid #01764D",
+            boxShadow: "0px 4.4px 2px 0px rgba(255, 255, 255, 0.33) inset",
+            opacity: !isAuthenticated ? 0.4 : 1,
+            cursor: !isAuthenticated ? 'not-allowed' : 'pointer',
+          }}
+        >
+          CASHOUT
+        </button>
+      ) : (
+        <button
+          disabled={!betAmount || parseFloat(betAmount) <= 0 || betPlaced || gameStatus === GAME_STATES.InProgress || !isAuthenticated || parseFloat(betAmount) > balance}
+          onClick={() => {
+            if (onBetAmountChange && parseFloat(betAmount) > 0 && !betPlaced && gameStatus !== GAME_STATES.InProgress && isAuthenticated) {
+              onBetAmountChange(parseFloat(betAmount));
+            }
+          }}
+          className="w-full retro-text text-lg mb-4 px-6 py-3 text-white rounded-lg transition-all duration-150"
+          style={{
+            background:
+              "radial-gradient(87.05% 70.83% at 50% 70.83%, #FFC83E 55.29%, #F38A00 100%)",
+            border: "1.8px solid #BB5700",
+            boxShadow: "0px 4.4px 2px 0px rgba(255, 255, 255, 0.33) inset",
+            opacity: !betAmount || parseFloat(betAmount) <= 0 || betPlaced || gameStatus === GAME_STATES.InProgress || !isAuthenticated || parseFloat(betAmount) > balance ? 0.4 : 1,
+            cursor: !betAmount || parseFloat(betAmount) <= 0 || betPlaced || gameStatus === GAME_STATES.InProgress || !isAuthenticated || parseFloat(betAmount) > balance ? 'not-allowed' : 'pointer',
+          }}
+        >
+          {!isAuthenticated ? 'SIGN IN TO PLAY' : gameStatus === GAME_STATES.InProgress ? 'GAME IN PROGRESS' : betPlaced ? 'BET PLACED' : 'PLACE BET'}
+        </button>
+      )}
 
       {/* Dashed Separator */}
       <div className="custom-dashed-border mb-4" />
@@ -223,7 +258,14 @@ export function BettingPanel({ cashoutMultiplier, onCashoutChange, onBetAmountCh
       {/* Players List - Takes remaining space */}
       <div className="flex-1 overflow-hidden">
         <PlayersList
-          players={dummyPlayers}
+          players={players.map(p => ({
+            id: p.playerID,
+            username: p.username || 'Anonymous',
+            betAmount: p.betAmount,
+            status: p.status === 1 ? 'IN-PLAY' : p.status === 2 ? 'CASHED' : 'BUST',
+            profit: p.winningAmount ? p.winningAmount - p.betAmount : undefined,
+            currentMultiplier: p.status === 1 ? undefined : p.stoppedAt,
+          }))}
           totalPlayers={totalPlayers}
           totalBetPool={totalBetPool}
         />

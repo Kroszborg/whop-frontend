@@ -1,20 +1,41 @@
 'use client';
 
-import { multiplierHistory } from '@/lib/dummy-data';
 import { MultiplierBadge } from '@/types/game';
 
 interface MultiplierHistoryProps {
   onMultiplierClick: (value: number) => void;
+  history?: Array<{ crash_point: number; id: string }>;
 }
 
-export function MultiplierHistory({ onMultiplierClick }: MultiplierHistoryProps) {
+export function MultiplierHistory({ onMultiplierClick, history = [] }: MultiplierHistoryProps) {
+  // Convert crash history to badge format
+  const multiplierHistory: MultiplierBadge[] = history
+    .filter((game) => game && game.crash_point != null && Number(game.crash_point) > 0)
+    .map((game) => ({
+      value: Number(game.crash_point),
+      color: getColorForMultiplier(Number(game.crash_point)),
+    }));
+
+  // If no history, show empty state or placeholder
+  if (multiplierHistory.length === 0) {
+    return (
+      <div className="relative">
+        <div className="flex items-center gap-2 overflow-x-auto pb-2">
+          <div className="flex gap-2 min-w-max px-1 py-1">
+            <span className="text-gray-500 text-sm retro-body">No game history yet</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="relative">
       <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-700 hover:scrollbar-thumb-gray-600">
         <div className="flex gap-2 min-w-max px-1 py-1">
           {multiplierHistory.map((badge, index) => (
             <MultiplierBadgeComponent
-              key={index}
+              key={`${badge.value}-${index}`}
               badge={badge}
               onClick={() => onMultiplierClick(badge.value)}
             />
@@ -23,6 +44,16 @@ export function MultiplierHistory({ onMultiplierClick }: MultiplierHistoryProps)
       </div>
     </div>
   );
+}
+
+// Helper function to determine color based on multiplier value
+function getColorForMultiplier(value: number): MultiplierBadge['color'] {
+  if (value < 1.5) return 'dark'; // Red for low multipliers
+  if (value < 2.0) return 'orange';
+  if (value < 3.0) return 'yellow';
+  if (value < 5.0) return 'green';
+  if (value < 10.0) return 'cyan';
+  return 'purple'; // Purple for very high multipliers
 }
 
 interface MultiplierBadgeComponentProps {

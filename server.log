@@ -1,0 +1,26 @@
+
+> whop-frontend@0.1.0 dev
+> tsx server.ts
+
+> Ready on http://localhost:3000
+> Socket.IO server running on /socket.io
+Client connected to /crash: UGnCIDz92u3VC8QJAAAB
+Client disconnected from /crash: UGnCIDz92u3VC8QJAAAB
+ ✓ Compiled /api/auth/signin in 407ms (451 modules)
+ POST /api/auth/signin 200 in 968ms
+Client connected to /crash: a0LebKacTTrW_jR1AAAD
+Client disconnected from /crash: a0LebKacTTrW_jR1AAAD
+Client connected to /crash: WTwzkOcXW1FBJlEFAAAF
+Client connected to /coinflip: VUPUrs64Vp95NcevAAAG
+Client connected to /mines: p5E5kAVyAMd3-SScAAAH
+Client connected to /chat: il5bxk6Jx4WN8JEUAAAI
+Client disconnected from /crash: WTwzkOcXW1FBJlEFAAAF
+Client disconnected from /coinflip: VUPUrs64Vp95NcevAAAG
+Client disconnected from /mines: p5E5kAVyAMd3-SScAAAH
+Client disconnected from /chat: il5bxk6Jx4WN8JEUAAAI
+ ○ Compiling / ...
+ ✓ Compiled / in 2.3s (825 modules)
+ GET / 200 in 2553ms
+ ✓ Compiled /favicon.ico in 402ms (490 modules)
+ GET /favicon.ico 200 in 498ms
+ GET /favicon.ico 200 in 9ms

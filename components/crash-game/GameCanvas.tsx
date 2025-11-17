@@ -77,18 +77,29 @@ class BoomSpriteFrame {
 interface GameCanvasProps {
   betAmount: number;
   onGameStatusChange?: (status: number) => void;
+  multiplier?: number;
+  crashPoint?: number | null;
+  onCashout?: () => void;
+  isAuthenticated?: boolean;
+  gameStatus?: number; // Pass game status from parent when using Socket.IO
 }
 
-export function GameCanvas({ betAmount, onGameStatusChange }: GameCanvasProps) {
+export function GameCanvas({ betAmount, onGameStatusChange, multiplier, crashPoint, onCashout, isAuthenticated, gameStatus: parentGameStatus }: GameCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rocketImageRef = useRef<HTMLImageElement | null>(null);
   const explosionImageRef = useRef<HTMLImageElement | null>(null);
 
-  const [gameStatus, setGameStatus] = useState(GAME_STATES.NotStarted);
+  // Use parent gameStatus if provided (Socket.IO), otherwise use local state
+  const [localGameStatus, setLocalGameStatus] = useState(GAME_STATES.NotStarted);
+  const gameStatus = parentGameStatus !== undefined ? parentGameStatus : localGameStatus;
+  
   const [payout, setPayout] = useState(0.0); // Start from 0.00x
-  const [crashPoint, setCrashPoint] = useState(2.5);
   const [startTime, setStartTime] = useState(Date.now());
   const [countdown, setCountdown] = useState(20);
+  
+  // Use Socket.IO multiplier if available, otherwise use local state
+  const currentMultiplier = multiplier !== undefined && multiplier > 1.0 ? multiplier : payout;
+  const currentCrashPoint = crashPoint !== null && crashPoint !== undefined ? crashPoint : 2.5;
 
   // Game state
   const gameStateRef = useRef({
@@ -104,20 +115,22 @@ export function GameCanvas({ betAmount, onGameStatusChange }: GameCanvasProps) {
   // Trail history
   const trailRef = useRef<{x: number, y: number}[]>([]);
 
-  // Notify parent of game status changes
+  // Sync multiplier from Socket.IO
   useEffect(() => {
-    if (onGameStatusChange) {
+    if (multiplier !== undefined && multiplier > 0) {
+      setPayout(multiplier);
+    }
+  }, [multiplier]);
+
+  // Sync game status from parent (which comes from Socket.IO)
+  // When using Socket.IO, gameStatus prop should be passed from parent
+  // This effect only notifies parent of local state changes (fallback mode)
+  useEffect(() => {
+    if (onGameStatusChange && multiplier === undefined) {
+      // Only notify if not using Socket.IO (fallback mode)
       onGameStatusChange(gameStatus);
     }
-  }, [gameStatus, onGameStatusChange]);
-
-  // Generate random crash point
-  const generateCrashPoint = () => {
-    const random = Math.random();
-    if (random < 0.33) return 1.1 + Math.random() * 1.4; // 1.1-2.5
-    if (random < 0.66) return 2.5 + Math.random() * 2.5; // 2.5-5.0
-    return 5.0 + Math.random() * 5.0; // 5.0-10.0
-  };
+  }, [gameStatus, onGameStatusChange, multiplier]);
 
   // Load images
   useEffect(() => {
@@ -152,71 +165,83 @@ export function GameCanvas({ betAmount, onGameStatusChange }: GameCanvasProps) {
     };
   }, []);
 
-  // Game state machine
+  // Game state machine - sync with Socket.IO or use local fallback
   useEffect(() => {
     let interval: NodeJS.Timeout;
 
-    if (gameStatus === GAME_STATES.NotStarted) {
-      // Start the game after a brief moment
-      setTimeout(() => {
-        setGameStatus(GAME_STATES.Starting);
-        setStartTime(Date.now() + 20000); // 20 seconds from now
-        setCountdown(20);
-      }, 1000);
-    } else if (gameStatus === GAME_STATES.Starting) {
-      // Countdown timer
-      interval = setInterval(() => {
-        const timeLeft = Math.max(0, (startTime - Date.now()) / 1000);
-        setCountdown(Math.ceil(timeLeft));
-
-        if (timeLeft <= 0) {
-          setGameStatus(GAME_STATES.InProgress);
-          setStartTime(Date.now());
-          setCrashPoint(generateCrashPoint());
-          setPayout(0.0); // Start from 0.00x
-          trailRef.current = []; // Reset trail
-        }
-      }, 100);
-    } else if (gameStatus === GAME_STATES.InProgress) {
-      // Game loop - smooth payout increment
-      interval = setInterval(() => {
-        setPayout(prev => {
-          const next = prev + 0.01; // Increment speed
-
-          if (next >= crashPoint) {
-            setGameStatus(GAME_STATES.Over);
-            return crashPoint; // Set to crash point
-          }
-
-          return next;
-        });
-      }, 30); // 30ms for smooth updates
-    } else if (gameStatus === GAME_STATES.Over) {
-      // Wait 3 seconds then restart
-      setTimeout(() => {
-        setGameStatus(GAME_STATES.Starting);
-        setStartTime(Date.now() + 20000);
-        setCountdown(20);
-        setPayout(0.0); // Reset to 0.00x
-
-        // Reset game state
-        gameStateRef.current = {
-          particles: [],
-          stars: [],
-          crashX: 0,
-          crashY: 0,
-          rocketX: 0,
-          rocketY: 0,
-          rotation: 0,
-        };
+    // If using Socket.IO, sync with parent gameStatus prop
+    // Otherwise use local state machine
+    if (multiplier !== undefined) {
+      // Using Socket.IO - sync status from parent
+      // Reset trail when game starts
+      if (gameStatus === GAME_STATES.InProgress && trailRef.current.length === 0) {
         trailRef.current = [];
-      }, 3000);
+      }
+      // Show countdown during starting phase
+      if (gameStatus === GAME_STATES.Starting) {
+        // Calculate countdown based on when game should start
+        // Socket.IO games have 4 second wait + 6 second betting phase = 10 seconds total
+        const countdownInterval = setInterval(() => {
+          // This is a placeholder - actual countdown should come from Socket.IO
+          setCountdown(10);
+        }, 100);
+        return () => clearInterval(countdownInterval);
+      }
+    } else {
+      // Fallback: Local game state machine (for testing without Socket.IO)
+      if (localGameStatus === GAME_STATES.NotStarted) {
+        setTimeout(() => {
+          setLocalGameStatus(GAME_STATES.Starting);
+          setStartTime(Date.now() + 20000);
+          setCountdown(20);
+        }, 1000);
+      } else if (localGameStatus === GAME_STATES.Starting) {
+        interval = setInterval(() => {
+          const timeLeft = Math.max(0, (startTime - Date.now()) / 1000);
+          setCountdown(Math.ceil(timeLeft));
+
+          if (timeLeft <= 0) {
+            setLocalGameStatus(GAME_STATES.InProgress);
+            setStartTime(Date.now());
+            setPayout(0.0);
+            trailRef.current = [];
+          }
+        }, 100);
+      } else if (localGameStatus === GAME_STATES.InProgress) {
+        interval = setInterval(() => {
+          setPayout(prev => {
+            const next = prev + 0.01;
+            if (next >= currentCrashPoint) {
+              setLocalGameStatus(GAME_STATES.Over);
+              return currentCrashPoint;
+            }
+            return next;
+          });
+        }, 30);
+      } else if (localGameStatus === GAME_STATES.Over) {
+        setTimeout(() => {
+          setLocalGameStatus(GAME_STATES.Starting);
+          setStartTime(Date.now() + 20000);
+          setCountdown(20);
+          setPayout(0.0);
+          gameStateRef.current = {
+            particles: [],
+            stars: [],
+            crashX: 0,
+            crashY: 0,
+            rocketX: 0,
+            rocketY: 0,
+            rotation: 0,
+          };
+          trailRef.current = [];
+        }, 3000);
+      }
     }
 
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [gameStatus, startTime, crashPoint]);
+  }, [gameStatus, localGameStatus, startTime, currentCrashPoint, multiplier]);
 
   // Canvas drawing loop
   useEffect(() => {
@@ -250,12 +275,12 @@ export function GameCanvas({ betAmount, onGameStatusChange }: GameCanvasProps) {
       ctx.clearRect(0, 0, width, height);
 
       // Calculate dynamic max value for Y-axis (smooth scaling)
-      const maxValue = Math.max(6, payout + 1);
+      const maxValue = Math.max(6, currentMultiplier + 1);
 
-      // Calculate rocket Y position directly from payout to match Y-axis
-      // Map payout value (0.0x to maxValue) to Y position (bottom to top)
+      // Calculate rocket Y position directly from multiplier to match Y-axis
+      // Map multiplier value (0.0x to maxValue) to Y position (bottom to top)
       const payoutRange = maxValue; // Range from 0.0x to maxValue
-      const progress = payout / payoutRange; // 0 to 1 (0.0x = 0, maxValue = 1)
+      const progress = currentMultiplier / payoutRange; // 0 to 1 (0.0x = 0, maxValue = 1)
 
       // Calculate Y position - rocket should be at exact Y-axis label position
       const startY = height - padding; // Bottom (0.0x position)
@@ -406,12 +431,12 @@ export function GameCanvas({ betAmount, onGameStatusChange }: GameCanvasProps) {
       window.removeEventListener('resize', updateCanvasSize);
       cancelAnimationFrame(animationFrameId);
     };
-  }, [gameStatus, payout]);
+  }, [gameStatus, currentMultiplier, multiplier, currentCrashPoint]);
 
-  // Generate dynamic Y-axis values based on current payout
+  // Generate dynamic Y-axis values based on current multiplier
   const generateYAxisValues = () => {
-    // Smooth scaling - always show current payout + buffer
-    const maxValue = Math.max(6, payout + 1);
+    // Smooth scaling - always show current multiplier + buffer
+    const maxValue = Math.max(6, currentMultiplier + 1);
 
     const values = [];
 
@@ -515,10 +540,10 @@ export function GameCanvas({ betAmount, onGameStatusChange }: GameCanvasProps) {
                     : "2px 4px 0px #000000",
               }}
             >
-              {payout.toFixed(2)}x
+              {currentMultiplier.toFixed(2)}x
             </div>
-            {/* Show profit if bet is placed and payout >= 1.0x */}
-            {betAmount > 0 && gameStatus === GAME_STATES.InProgress && payout >= 1.0 && (
+            {/* Show profit if bet is placed and multiplier >= 1.0x */}
+            {betAmount > 0 && gameStatus === GAME_STATES.InProgress && currentMultiplier >= 1.0 && (
               <div className="text-[#0AFDA5] retro-body text-xl md:text-2xl font-semibold mt-2 flex flex-row items-center gap-2 justify-center">
                   <Image
                     src="/solana.svg"
@@ -527,8 +552,17 @@ export function GameCanvas({ betAmount, onGameStatusChange }: GameCanvasProps) {
                     height={20}
                     className="text-gray-500"
                   />{" "}
-                  +{(betAmount * (payout - 1)).toFixed(4)}
+                  +{(betAmount * (currentMultiplier - 1)).toFixed(4)}
               </div>
+            )}
+            {/* Cashout button overlay during game */}
+            {betAmount > 0 && gameStatus === GAME_STATES.InProgress && isAuthenticated && onCashout && (
+              <button
+                onClick={onCashout}
+                className="mt-4 px-6 py-2 bg-gradient-to-r from-[#18FFAA] to-[#01764D] text-white rounded-lg font-bold retro-text hover:brightness-110 transition-all"
+              >
+                CASHOUT NOW
+              </button>
             )}
           </>
         )}

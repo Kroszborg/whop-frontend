@@ -1,7 +1,7 @@
 import { Server as SocketIOServer, Namespace } from 'socket.io';
 import { verifyToken } from '@/lib/jwt';
 import { createServerClient } from '@/lib/supabase';
-import { CRASH_CONFIG, TRANSACTION_TYPES, GAME_TYPES, GAME_STATES, BOT_CONFIG, CRASH_GAME_CONFIG, type BetType } from '@/types/database';
+import { CRASH_CONFIG, TRANSACTION_TYPES, GAME_TYPES, GAME_STATES, BOT_CONFIG, CRASH_GAME_CONFIG, type BetType, type AIUser } from '@/types/database';
 import * as crypto from 'crypto';
 
 interface CrashSocket extends Socket {
@@ -43,6 +43,52 @@ let currentGame: {
   publicSeed: null,
   currentMultiplier: 1.0,
 };
+
+const AI_USER_CACHE_TTL = 1000 * 60 * 10; // 10 minutes
+let cachedAIUsers: AIUser[] = [];
+let lastAIUserFetch = 0;
+const botWallets: Record<string, number> = {};
+
+function updateBotWallet(botId: string, delta: number) {
+  const current = botWallets[botId] ?? 0;
+  const next = Number((current + delta).toFixed(2));
+  botWallets[botId] = next;
+  return next;
+}
+
+async function getCachedAIUsers(): Promise<AIUser[]> {
+  const now = Date.now();
+  if (cachedAIUsers.length && now - lastAIUserFetch < AI_USER_CACHE_TTL) {
+    return cachedAIUsers;
+  }
+
+  try {
+    const supabase = createServerClient();
+    const { data, error } = await supabase
+      .from('ai_users')
+      .select('*')
+      .limit(BOT_CONFIG.AI_USER_POOL_SIZE);
+
+    if (error) {
+      console.error('Error fetching AI users for bots:', error);
+      return cachedAIUsers;
+    }
+
+    if (data && data.length) {
+      cachedAIUsers = data;
+      lastAIUserFetch = now;
+      cachedAIUsers.forEach((bot) => {
+        if (typeof botWallets[bot.id] !== 'number') {
+          botWallets[bot.id] = Number(bot.wallet) || 0;
+        }
+      });
+    }
+  } catch (err) {
+    console.error('Failed to refresh AI user cache:', err);
+  }
+
+  return cachedAIUsers;
+}
 
 // Game interval and timeout variables (for future use)
 // let gameInterval: NodeJS.Timeout | null = null;
@@ -429,16 +475,10 @@ async function getPublicSeed(): Promise<string> {
  */
 async function addBotPlayers(namespace: Namespace) {
   try {
-    const supabase = createServerClient();
-    
-    // Fetch AI users from database
-    const { data: aiUsers, error } = await supabase
-      .from('ai_users')
-      .select('*')
-      .limit(BOT_CONFIG.AI_USER_POOL_SIZE); // Get a pool of AI users to choose from
+    const aiUsers = await getCachedAIUsers();
 
-    if (error || !aiUsers || aiUsers.length === 0) {
-      console.warn('No AI users found, skipping bot players');
+    if (!aiUsers.length) {
+      console.warn('No AI users available (cache empty), skipping bot players');
       return;
     }
 
@@ -471,7 +511,12 @@ async function addBotPlayers(namespace: Namespace) {
         winningAmount: 0,
         crypto: bot.crypto,
         forcedCashout: false,
+        isBot: true,
       };
+
+      const currentWallet = botWallets[bot.id] ?? Number(bot.wallet);
+      const remaining = currentWallet - betAmount;
+      botWallets[bot.id] = Number(Math.max(0, remaining).toFixed(2));
 
       currentGame.players[bot.id] = betEntry;
     }
@@ -553,6 +598,12 @@ async function checkAutoCashouts(currentMultiplier: number, namespace: Namespace
         player.winningAmount = payout;
         
         try {
+          if (player.isBot) {
+            const newWallet = updateBotWallet(playerId, payout);
+            console.log(`Bot ${player.username} auto cashed out at ${cashoutMultiplier.toFixed(2)}x (wallet -> ${newWallet.toFixed(2)})`);
+            continue;
+          }
+
           // Try to find user in users table first (real user)
           const { data: user } = await supabase
             .from('users')
@@ -581,21 +632,7 @@ async function checkAutoCashouts(currentMultiplier: number, namespace: Namespace
             
             console.log(`User ${player.username} auto cashed out at ${cashoutMultiplier.toFixed(2)}x`);
           } else {
-            // Bot - update bot's wallet in database
-            const { data: botUser } = await supabase
-              .from('ai_users')
-              .select('wallet')
-              .eq('id', playerId)
-              .single();
-            
-            if (botUser) {
-              const newWallet = Number(botUser.wallet) + payout;
-              await supabase
-                .from('ai_users')
-                .update({ wallet: newWallet.toFixed(2) })
-                .eq('id', playerId);
-            }
-            console.log(`Bot ${player.username} auto cashed out at ${cashoutMultiplier.toFixed(2)}x`);
+            console.warn(`Auto cashout triggered for unknown player ${playerId} - skipping DB update`);
           }
         } catch (error) {
           console.error(`Error updating wallet for ${playerId}:`, error);

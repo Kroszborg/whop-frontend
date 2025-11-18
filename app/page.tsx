@@ -105,12 +105,22 @@ export default function Home() {
       window.location.reload();
     };
 
+    const handleCashoutSuccessToast = (event: CustomEvent<{ multiplier: number; payout: number }>) => {
+      const { multiplier, payout } = event.detail;
+      toast.success(`+${payout.toFixed(4)} SOL`, {
+        description: `Cashed out at ${multiplier.toFixed(2)}x`,
+        duration: 3000,
+      });
+    };
+
     window.addEventListener('game-error', handleGameError as EventListener);
     window.addEventListener('token-expired', handleTokenExpired as EventListener);
+    window.addEventListener('cashout-success', handleCashoutSuccessToast as EventListener);
 
     return () => {
       window.removeEventListener('game-error', handleGameError as EventListener);
       window.removeEventListener('token-expired', handleTokenExpired as EventListener);
+      window.removeEventListener('cashout-success', handleCashoutSuccessToast as EventListener);
     };
   }, []);
 
@@ -256,10 +266,6 @@ export default function Home() {
               onGameStatusChange={setGameStatus}
               multiplier={gameState.multiplier >= 1.0 ? gameState.multiplier : undefined}
               crashPoint={gameState.crashPoint}
-              onCashout={() => {
-                cashout();
-                setCashedOut(true);
-              }}
               isAuthenticated={isAuthenticated && socketAuthenticated}
               gameStatus={gameStatus}
               socketCountdown={gameState.countdown}

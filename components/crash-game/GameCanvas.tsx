@@ -79,14 +79,13 @@ interface GameCanvasProps {
   onGameStatusChange?: (status: number) => void;
   multiplier?: number;
   crashPoint?: number | null;
-  onCashout?: () => void;
   isAuthenticated?: boolean;
   gameStatus?: number; // Pass game status from parent when using Socket.IO
   socketCountdown?: number; // Countdown from Socket.IO
   cashedOut?: boolean;
 }
 
-export function GameCanvas({ betAmount, onGameStatusChange, multiplier, crashPoint, onCashout, isAuthenticated, gameStatus: parentGameStatus, socketCountdown, cashedOut }: GameCanvasProps) {
+export function GameCanvas({ betAmount, onGameStatusChange, multiplier, crashPoint, isAuthenticated, gameStatus: parentGameStatus, socketCountdown, cashedOut }: GameCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rocketImageRef = useRef<HTMLImageElement | null>(null);
   const explosionImageRef = useRef<HTMLImageElement | null>(null);
@@ -580,7 +579,7 @@ export function GameCanvas({ betAmount, onGameStatusChange, multiplier, crashPoi
               {currentMultiplier.toFixed(2)}x
             </div>
             {/* Show profit if bet is placed and multiplier >= 1.0x */}
-            {betAmount > 0 && gameStatus === GAME_STATES.InProgress && currentMultiplier >= 1.0 && (
+            {betAmount > 0 && gameStatus === GAME_STATES.InProgress && currentMultiplier >= 1.0 && !cashedOut && (
               <div className="text-[#0AFDA5] retro-body text-xl md:text-2xl font-semibold mt-2 flex flex-row items-center gap-2 justify-center">
                   <Image
                     src="/solana.svg"
@@ -591,15 +590,6 @@ export function GameCanvas({ betAmount, onGameStatusChange, multiplier, crashPoi
                   />{" "}
                   +{(betAmount * (currentMultiplier - 1)).toFixed(4)}
               </div>
-            )}
-            {/* Cashout button overlay during game */}
-            {betAmount > 0 && gameStatus === GAME_STATES.InProgress && isAuthenticated && onCashout && !cashedOut && (
-              <button
-                onClick={onCashout}
-                className="mt-4 px-6 py-2 bg-gradient-to-r from-[#18FFAA] to-[#01764D] text-white rounded-lg font-bold retro-text hover:brightness-110 transition-all"
-              >
-                CASHOUT NOW
-              </button>
             )}
           </>
         )}

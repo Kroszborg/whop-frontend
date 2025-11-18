@@ -38,7 +38,8 @@ export function BettingPanel({
   const [betAmount, setBetAmount] = useState<string>('0.00');
   const [estimatedProfit, setEstimatedProfit] = useState<string>('0.00');
   const [autoModeActive, setAutoModeActive] = useState(false);
-  const prevGameStatusRef = useRef<number | undefined>();
+  const prevGameStatusRef = useRef<number | undefined>(undefined);
+  const betInputsLocked = betPlaced;
 
   useEffect(() => {
     if (parseFloat(betAmount) > 0) {
@@ -71,6 +72,7 @@ export function BettingPanel({
   }, [betMode]);
 
   const handleBetAmountChange = (value: string) => {
+    if (betInputsLocked) return;
     setBetAmount(value);
     if (parseFloat(value) > 0) {
       const profit = parseFloat(value) * cashoutMultiplier - parseFloat(value);
@@ -81,15 +83,18 @@ export function BettingPanel({
   };
 
   const handleMultiplyBet = (multiplier: number) => {
+    if (betInputsLocked) return;
     const current = parseFloat(betAmount) || 0;
     handleBetAmountChange((current * multiplier).toFixed(2));
   };
 
   const handleMaxBet = () => {
+    if (betInputsLocked) return;
     handleBetAmountChange(balance.toFixed(2));
   };
 
   const handleCashoutChange = (delta: number) => {
+    if (betInputsLocked) return;
     const newValue = Math.max(1.01, cashoutMultiplier + delta);
     onCashoutChange(parseFloat(newValue.toFixed(2)));
   };
@@ -130,41 +135,51 @@ export function BettingPanel({
             type="number"
             value={betAmount}
             onChange={(e) => handleBetAmountChange(e.target.value)}
-            className="w-full bet-input text-white rounded-lg px-4 py-3 text-lg font-medium retro-body "
+            disabled={betInputsLocked}
+            className={`w-full bet-input text-white rounded-lg px-4 py-3 text-lg font-medium retro-body ${betInputsLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
             placeholder="0.00"
           />
           <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
             <button
               onClick={() => handleMultiplyBet(0.5)}
+              disabled={betInputsLocked}
               className="px-2.5 py-1 text-white text-sm rounded-md retro-body transition-all duration-150 cursor-pointer hover:brightness-110"
               style={{
                 background: "radial-gradient(80.22% 65.28% at 50% 76.39%, #525252 55.29%, #171717 100%), linear-gradient(0deg, rgba(0, 0, 0, 0.67), rgba(0, 0, 0, 0.67))",
                 border: "1.8px solid #232323",
                 boxShadow: "0px 2px 2px 0px rgba(255, 255, 255, 0.25) inset",
+                opacity: betInputsLocked ? 0.4 : 1,
+                cursor: betInputsLocked ? 'not-allowed' : 'pointer',
               }}
             >
               1/2
             </button>
             <button
               onClick={() => handleMultiplyBet(2)}
+              disabled={betInputsLocked}
               className="px-2.5 py-1 text-white text-sm rounded-md retro-body transition-all duration-150 cursor-pointer hover:brightness-110"
               style={{
                 background:
                   "radial-gradient(80.22% 65.28% at 50% 76.39%, #525252 55.29%, #171717 100%), linear-gradient(0deg, rgba(0, 0, 0, 0.67), rgba(0, 0, 0, 0.67))",
                 border: "1.8px solid #232323",
                 boxShadow: "0px 2px 2px 0px rgba(255, 255, 255, 0.25) inset",
+                opacity: betInputsLocked ? 0.4 : 1,
+                cursor: betInputsLocked ? 'not-allowed' : 'pointer',
               }}
             >
               2×
             </button>
             <button
               onClick={handleMaxBet}
+              disabled={betInputsLocked}
               className="px-2.5 py-1 text-white text-sm rounded-md retro-body transition-all duration-150 cursor-pointer hover:brightness-110"
               style={{
                 background:
                   "radial-gradient(80.22% 65.28% at 50% 76.39%, #525252 55.29%, #171717 100%), linear-gradient(0deg, rgba(0, 0, 0, 0.67), rgba(0, 0, 0, 0.67))",
                 border: "1.8px solid #232323",
                 boxShadow: "0px 2px 2px 0px rgba(255, 255, 255, 0.25) inset",
+                opacity: betInputsLocked ? 0.4 : 1,
+                cursor: betInputsLocked ? 'not-allowed' : 'pointer',
               }}
             >
               MAX
@@ -188,24 +203,30 @@ export function BettingPanel({
           <div className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-row gap-0.5">
             <button
               onClick={() => handleCashoutChange(-0.1)}
+              disabled={betInputsLocked}
               className="px-2.5 py-1 text-white text-sm rounded-md retro-body transition-all duration-150 cursor-pointer hover:brightness-110"
               style={{
                 background:
                   "radial-gradient(80.22% 65.28% at 50% 76.39%, #525252 55.29%, #171717 100%), linear-gradient(0deg, rgba(0, 0, 0, 0.67), rgba(0, 0, 0, 0.67))",
                 border: "1.8px solid #232323",
                 boxShadow: "0px 2px 2px 0px rgba(255, 255, 255, 0.25) inset",
+                opacity: betInputsLocked ? 0.4 : 1,
+                cursor: betInputsLocked ? 'not-allowed' : 'pointer',
               }}
             >
               <ChevronDown className="w-4 h-4 text-gray-400" />
             </button>
             <button
               onClick={() => handleCashoutChange(0.1)}
+              disabled={betInputsLocked}
               className="px-2.5 py-1 text-white text-sm rounded-md retro-body transition-all duration-150 cursor-pointer hover:brightness-110"
               style={{
                 background:
                   "radial-gradient(80.22% 65.28% at 50% 76.39%, #525252 55.29%, #171717 100%), linear-gradient(0deg, rgba(0, 0, 0, 0.67), rgba(0, 0, 0, 0.67))",
                 border: "1.8px solid #232323",
                 boxShadow: "0px 2px 2px 0px rgba(255, 255, 255, 0.25) inset",
+                opacity: betInputsLocked ? 0.4 : 1,
+                cursor: betInputsLocked ? 'not-allowed' : 'pointer',
               }}
             >
               <ChevronUp className="w-4 h-4 text-gray-400" />
@@ -348,6 +369,7 @@ export function BettingPanel({
           players={players.map(p => ({
             id: p.playerID,
             username: p.username || 'Anonymous',
+            avatar: p.avatar || '',
             betAmount: p.betAmount,
             status: p.status === 1 ? 'IN-PLAY' : p.status === 2 ? 'CASHED' : 'BUST',
             profit: p.winningAmount ? p.winningAmount - p.betAmount : undefined,

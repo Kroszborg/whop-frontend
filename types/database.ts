@@ -54,6 +54,7 @@ export interface BetType {
   crypto: string;
   forcedCashout?: boolean;
   autobet?: boolean;
+  isBot?: boolean;
 }
 
 export interface CoinflipGame {

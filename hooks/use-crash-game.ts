@@ -185,8 +185,12 @@ export function useCrashGame(token?: string, address?: string) {
 
     const handleCashoutSuccess = (...args: unknown[]) => {
       const data = args[0] as { multiplier: number; payout: number };
-      if (data) {
-        // console.log('Cashout successful:', data);
+      if (data && typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('cashout-success', {
+            detail: data,
+          })
+        );
       }
     };
 

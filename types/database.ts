@@ -217,8 +217,8 @@ export const GAME_TYPES = {
 
 // Game configuration
 export const CRASH_CONFIG = {
-  START_WAIT_TIME: 4000, // ms before game starts
-  RESTART_WAIT_TIME: 6000, // ms between games
+  START_WAIT_TIME: 10000, // ms before game starts (betting phase)
+  RESTART_WAIT_TIME: 2000, // ms between games
   TICK_RATE: 150, // ms between multiplier updates
   MIN_BET: 0.1,
   MAX_BET: 500,

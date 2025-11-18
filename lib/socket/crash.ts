@@ -340,10 +340,32 @@ async function createNewCrashGame(namespace: Namespace) {
   // Add bot players (8-11 bots per game)
   await addBotPlayers(namespace);
 
+  // Emit game-starting event to notify players betting phase has begun
+  const countdownSeconds = Math.floor(CRASH_CONFIG.START_WAIT_TIME / 1000);
+  const countdownStartTime = Date.now();
+
+  namespace.emit('game-starting', { countdown: countdownSeconds });
+  console.log(`🟢 Emitted game-starting with ${countdownSeconds}s countdown (betting phase)`);
+
+  // Send countdown updates every second
+  const countdownInterval = setInterval(() => {
+    const elapsed = Date.now() - countdownStartTime;
+    const remaining = Math.max(0, Math.ceil((CRASH_CONFIG.START_WAIT_TIME - elapsed) / 1000));
+
+    if (remaining > 0) {
+      namespace.emit('game-starting', { countdown: remaining });
+    } else {
+      clearInterval(countdownInterval);
+    }
+  }, 1000);
+
   // Wait before starting
   await new Promise(resolve => setTimeout(resolve, CRASH_CONFIG.START_WAIT_TIME));
 
-  namespace.emit('game-start');
+  clearInterval(countdownInterval);
+
+  namespace.emit('game-start', { startTime: Date.now() });
+  console.log('🚀 Emitted game-start - game now in progress');
   currentGame.status = GAME_STATES.InProgress;
   currentGame.startedAt = new Date();
   

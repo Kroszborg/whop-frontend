@@ -82,9 +82,11 @@ interface GameCanvasProps {
   onCashout?: () => void;
   isAuthenticated?: boolean;
   gameStatus?: number; // Pass game status from parent when using Socket.IO
+  socketCountdown?: number; // Countdown from Socket.IO
+  cashedOut?: boolean;
 }
 
-export function GameCanvas({ betAmount, onGameStatusChange, multiplier, crashPoint, onCashout, isAuthenticated, gameStatus: parentGameStatus }: GameCanvasProps) {
+export function GameCanvas({ betAmount, onGameStatusChange, multiplier, crashPoint, onCashout, isAuthenticated, gameStatus: parentGameStatus, socketCountdown, cashedOut }: GameCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rocketImageRef = useRef<HTMLImageElement | null>(null);
   const explosionImageRef = useRef<HTMLImageElement | null>(null);
@@ -92,13 +94,13 @@ export function GameCanvas({ betAmount, onGameStatusChange, multiplier, crashPoi
   // Use parent gameStatus if provided (Socket.IO), otherwise use local state
   const [localGameStatus, setLocalGameStatus] = useState(GAME_STATES.NotStarted);
   const gameStatus = parentGameStatus !== undefined ? parentGameStatus : localGameStatus;
-  
-  const [payout, setPayout] = useState(0.0); // Start from 0.00x
+
+  const [payout, setPayout] = useState(1.0); // Start from 1.00x
   const [startTime, setStartTime] = useState(Date.now());
-  const [countdown, setCountdown] = useState(20);
-  
+  const [countdown, setCountdown] = useState(10);
+
   // Use Socket.IO multiplier if available, otherwise use local state
-  const currentMultiplier = multiplier !== undefined && multiplier > 1.0 ? multiplier : payout;
+  const currentMultiplier = multiplier !== undefined && multiplier >= 1.0 ? multiplier : payout;
   const currentCrashPoint = crashPoint !== null && crashPoint !== undefined ? crashPoint : 2.5;
 
   // Game state
@@ -117,10 +119,17 @@ export function GameCanvas({ betAmount, onGameStatusChange, multiplier, crashPoi
 
   // Sync multiplier from Socket.IO
   useEffect(() => {
-    if (multiplier !== undefined && multiplier > 0) {
+    if (multiplier !== undefined && multiplier >= 1.0) {
       setPayout(multiplier);
     }
   }, [multiplier]);
+
+  // Sync countdown from Socket.IO
+  useEffect(() => {
+    if (socketCountdown !== undefined && gameStatus === GAME_STATES.Starting) {
+      setCountdown(socketCountdown);
+    }
+  }, [socketCountdown, gameStatus]);
 
   // Sync game status from parent (which comes from Socket.IO)
   // When using Socket.IO, gameStatus prop should be passed from parent
@@ -165,6 +174,22 @@ export function GameCanvas({ betAmount, onGameStatusChange, multiplier, crashPoi
     };
   }, []);
 
+  // Clear trail and reset game state when transitioning to Starting phase
+  useEffect(() => {
+    if (gameStatus === GAME_STATES.Starting) {
+      // COMPLETELY CLEAR TRAIL
+      trailRef.current = [];
+      gameStateRef.current.particles = [];
+      gameStateRef.current.rocketX = 0;
+      gameStateRef.current.rocketY = 0;
+      setPayout(1.0);
+      console.log('TRAIL CLEARED - New game starting');
+    } else if (gameStatus === GAME_STATES.Over) {
+      // Game ended - freeze trail at crash position
+      console.log('Game crashed - trail frozen at', trailRef.current.length, 'points');
+    }
+  }, [gameStatus]);
+
   // Game state machine - sync with Socket.IO or use local fallback
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -173,20 +198,7 @@ export function GameCanvas({ betAmount, onGameStatusChange, multiplier, crashPoi
     // Otherwise use local state machine
     if (multiplier !== undefined) {
       // Using Socket.IO - sync status from parent
-      // Reset trail when game starts
-      if (gameStatus === GAME_STATES.InProgress && trailRef.current.length === 0) {
-        trailRef.current = [];
-      }
-      // Show countdown during starting phase
-      if (gameStatus === GAME_STATES.Starting) {
-        // Calculate countdown based on when game should start
-        // Socket.IO games have 4 second wait + 6 second betting phase = 10 seconds total
-        const countdownInterval = setInterval(() => {
-          // This is a placeholder - actual countdown should come from Socket.IO
-          setCountdown(10);
-        }, 100);
-        return () => clearInterval(countdownInterval);
-      }
+      // Trail will be managed in the draw loop
     } else {
       // Fallback: Local game state machine (for testing without Socket.IO)
       if (localGameStatus === GAME_STATES.NotStarted) {
@@ -203,7 +215,7 @@ export function GameCanvas({ betAmount, onGameStatusChange, multiplier, crashPoi
           if (timeLeft <= 0) {
             setLocalGameStatus(GAME_STATES.InProgress);
             setStartTime(Date.now());
-            setPayout(0.0);
+            setPayout(1.0);
             trailRef.current = [];
           }
         }, 100);
@@ -223,7 +235,7 @@ export function GameCanvas({ betAmount, onGameStatusChange, multiplier, crashPoi
           setLocalGameStatus(GAME_STATES.Starting);
           setStartTime(Date.now() + 20000);
           setCountdown(20);
-          setPayout(0.0);
+          setPayout(1.0);
           gameStateRef.current = {
             particles: [],
             stars: [],
@@ -271,19 +283,25 @@ export function GameCanvas({ betAmount, onGameStatusChange, multiplier, crashPoi
       const height = canvas.height;
       const padding = 60;
 
-      // Clear canvas
+      // Clear canvas completely
       ctx.clearRect(0, 0, width, height);
+
+      // If game is starting or not started, don't draw anything (clear state)
+      if (gameStatus === GAME_STATES.Starting || gameStatus === GAME_STATES.NotStarted) {
+        // Canvas is cleared - no trail, no rocket
+        return;
+      }
 
       // Calculate dynamic max value for Y-axis (smooth scaling)
       const maxValue = Math.max(6, currentMultiplier + 1);
 
       // Calculate rocket Y position directly from multiplier to match Y-axis
-      // Map multiplier value (0.0x to maxValue) to Y position (bottom to top)
-      const payoutRange = maxValue; // Range from 0.0x to maxValue
-      const progress = currentMultiplier / payoutRange; // 0 to 1 (0.0x = 0, maxValue = 1)
+      // Map multiplier value (1.0x to maxValue) to Y position (bottom to top)
+      const payoutRange = maxValue - 1.0; // Range from 1.0x to maxValue
+      const progress = (currentMultiplier - 1.0) / payoutRange; // 0 to 1 (1.0x = 0, maxValue = 1)
 
       // Calculate Y position - rocket should be at exact Y-axis label position
-      const startY = height - padding; // Bottom (0.0x position)
+      const startY = height - padding; // Bottom (1.0x position)
       const endY = padding; // Top (maxValue position)
       const rocketY = startY - (progress * (startY - endY)); // Linear mapping from bottom to top
 
@@ -307,27 +325,19 @@ export function GameCanvas({ betAmount, onGameStatusChange, multiplier, crashPoi
       gameStateRef.current.rocketY = rocketY;
       gameStateRef.current.rotation = rotation;
 
-      // Generate and draw stars only during active gameplay
-     
-
-      // Add current position to trail during flight
-      if (gameStatus === GAME_STATES.InProgress) {
-        trailRef.current.push({ x: rocketX, y: rocketY });
-        // Don't limit trail length - let it grow from start to current position
-      }
-
-      // Draw trail during gameplay and after crash (to show full trail path)
-      if (trailRef.current.length > 1 && (gameStatus === GAME_STATES.InProgress || gameStatus === GAME_STATES.Over)) {
+      // DRAW TRAIL FIRST (so it appears BEHIND the rocket)
+      // Only draw trail during game or after crash
+      if ((gameStatus === GAME_STATES.InProgress || gameStatus === GAME_STATES.Over) && trailRef.current.length > 1) {
         const trailStart = trailRef.current[0];
         const trailEnd = trailRef.current[trailRef.current.length - 1];
 
-        // Trail glow
+        // Outer glow (thickest layer)
         ctx.save();
-        ctx.strokeStyle = 'rgba(250, 202, 21, 0.3)';
-        ctx.lineWidth = 12;
+        ctx.strokeStyle = 'rgba(255, 200, 62, 0.4)';
+        ctx.lineWidth = 20;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
-        ctx.filter = 'blur(8px)';
+        ctx.filter = 'blur(10px)';
         ctx.beginPath();
         ctx.moveTo(trailStart.x, trailStart.y);
         for (let i = 1; i < trailRef.current.length; i++) {
@@ -336,20 +346,35 @@ export function GameCanvas({ betAmount, onGameStatusChange, multiplier, crashPoi
         ctx.stroke();
         ctx.restore();
 
-        // Main trail with gradient from start to end
+        // Middle glow
+        ctx.save();
+        ctx.strokeStyle = 'rgba(250, 202, 21, 0.6)';
+        ctx.lineWidth = 12;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.filter = 'blur(5px)';
+        ctx.beginPath();
+        ctx.moveTo(trailStart.x, trailStart.y);
+        for (let i = 1; i < trailRef.current.length; i++) {
+          ctx.lineTo(trailRef.current[i].x, trailRef.current[i].y);
+        }
+        ctx.stroke();
+        ctx.restore();
+
+        // Main trail with gradient (thick)
         const gradient = ctx.createLinearGradient(
           trailStart.x,
           trailStart.y,
           trailEnd.x,
           trailEnd.y
         );
-        gradient.addColorStop(0, 'rgba(110, 170, 206, 0.3)');
-        gradient.addColorStop(0.5, 'rgba(250, 202, 21, 0.8)');
+        gradient.addColorStop(0, 'rgba(110, 170, 206, 0.5)');
+        gradient.addColorStop(0.5, 'rgba(250, 202, 21, 0.9)');
         gradient.addColorStop(1, '#FFC83E');
 
         ctx.save();
         ctx.strokeStyle = gradient;
-        ctx.lineWidth = 4;
+        ctx.lineWidth = 6;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         ctx.beginPath();
@@ -360,10 +385,10 @@ export function GameCanvas({ betAmount, onGameStatusChange, multiplier, crashPoi
         ctx.stroke();
         ctx.restore();
 
-        // Inner bright core
+        // Inner bright core (white)
         ctx.save();
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.lineWidth = 2;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         ctx.beginPath();
@@ -375,7 +400,19 @@ export function GameCanvas({ betAmount, onGameStatusChange, multiplier, crashPoi
         ctx.restore();
       }
 
-      // Draw rocket or explosion
+      // Add current position to trail ONLY during flight (not after crash or before start)
+      if (gameStatus === GAME_STATES.InProgress && currentMultiplier >= 1.0) {
+        // Add every point - no distance filtering for smooth trail
+        trailRef.current.push({ x: rocketX, y: rocketY });
+
+        // Keep trail longer for visibility at high multipliers (1500 points)
+        // This ensures trail is visible even at 20x+ multipliers
+        if (trailRef.current.length > 1500) {
+          trailRef.current.shift();
+        }
+      }
+
+      // DRAW ROCKET SECOND (so it appears ON TOP of trail)
       if (gameStatus === GAME_STATES.InProgress) {
         // Only show rocket during active gameplay
         if (rocketImageRef.current) {
@@ -440,14 +477,14 @@ export function GameCanvas({ betAmount, onGameStatusChange, multiplier, crashPoi
 
     const values = [];
 
-    // Generate values with 0.5x increments starting from 0.00x
-    const numSteps = Math.floor(maxValue * 2); // 0.5x increments
-    for (let i = 0; i <= numSteps; i++) { // Start from i=0 to get 0.0x
-      const value = i * 0.5;
+    // Generate values with 0.5x increments starting from 1.00x
+    const numSteps = Math.floor((maxValue - 1.0) * 2); // 0.5x increments
+    for (let i = 0; i <= numSteps; i++) {
+      const value = 1.0 + (i * 0.5);
       let size = 'text-xs';
 
       // Make certain values more prominent
-      if (value % 2 === 0 && value > 0) {
+      if (value % 2 === 0) {
         size = 'text-sm font-semibold';
       } else if (value % 1 === 0) {
         size = 'text-xs font-medium';
@@ -556,7 +593,7 @@ export function GameCanvas({ betAmount, onGameStatusChange, multiplier, crashPoi
               </div>
             )}
             {/* Cashout button overlay during game */}
-            {betAmount > 0 && gameStatus === GAME_STATES.InProgress && isAuthenticated && onCashout && (
+            {betAmount > 0 && gameStatus === GAME_STATES.InProgress && isAuthenticated && onCashout && !cashedOut && (
               <button
                 onClick={onCashout}
                 className="mt-4 px-6 py-2 bg-gradient-to-r from-[#18FFAA] to-[#01764D] text-white rounded-lg font-bold retro-text hover:brightness-110 transition-all"

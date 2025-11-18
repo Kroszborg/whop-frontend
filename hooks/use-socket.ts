@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 
 interface UseSocketOptions {
@@ -38,7 +38,7 @@ export function useSocket(options: UseSocketOptions = {}) {
     socketRef.current = socket;
 
     socket.on('connect', () => {
-      console.log(`Connected to ${namespace}`);
+      // console.log(`Connected to ${namespace}`);
       setIsConnected(true);
       onConnect?.();
 
@@ -47,14 +47,14 @@ export function useSocket(options: UseSocketOptions = {}) {
     });
 
     socket.on('disconnect', () => {
-      console.log(`Disconnected from ${namespace}`);
+      // console.log(`Disconnected from ${namespace}`);
       setIsConnected(false);
       setIsAuthenticated(false);
       onDisconnect?.();
     });
 
     socket.on('auth-success', (data: { wallet: number }) => {
-      console.log('Authentication successful', data);
+      // console.log('Authentication successful', data);
       setIsAuthenticated(true);
     });
 
@@ -67,7 +67,20 @@ export function useSocket(options: UseSocketOptions = {}) {
     socket.on('expire-error', (error: string) => {
       console.error('Token expired:', error);
       setIsAuthenticated(false);
+      setIsConnected(false);
+
+      // Clear auth from localStorage and trigger re-login
+      localStorage.removeItem('auth');
+
+      // Emit custom event to notify app of token expiration
+      window.dispatchEvent(new CustomEvent('token-expired', {
+        detail: { message: error }
+      }));
+
       onError?.(error);
+
+      // Disconnect socket
+      socket.disconnect();
     });
 
     socket.on('connect_error', (error) => {
@@ -81,25 +94,25 @@ export function useSocket(options: UseSocketOptions = {}) {
     };
   }, [namespace, token, address, onConnect, onDisconnect, onError]);
 
-  const emit = (event: string, ...args: unknown[]) => {
+  const emit = useCallback((event: string, ...args: unknown[]) => {
     if (socketRef.current && isConnected && isAuthenticated) {
       socketRef.current.emit(event, ...args);
     } else {
       console.warn(`Cannot emit ${event}: socket not connected or authenticated`);
     }
-  };
+  }, [isConnected, isAuthenticated]);
 
-  const on = (event: string, callback: (...args: unknown[]) => void) => {
+  const on = useCallback((event: string, callback: (...args: unknown[]) => void) => {
     if (socketRef.current) {
       socketRef.current.on(event, callback);
     }
-  };
+  }, []);
 
-  const off = (event: string, callback?: (...args: unknown[]) => void) => {
+  const off = useCallback((event: string, callback?: (...args: unknown[]) => void) => {
     if (socketRef.current) {
       socketRef.current.off(event, callback);
     }
-  };
+  }, []);
 
   return {
     socket: socketRef.current,
